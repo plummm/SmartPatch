@@ -13,7 +13,7 @@ def sub_match(sub, line):
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument('-linux', nargs='?', action='store', default='/tmp/s2e-patch/linux-',
+    parser.add_argument('-linux', nargs='?', action='store',
                         help='the full path of linux kernel source code')
     parser.add_argument('-patch', nargs='?', action='store',
                         help='path of the patch json')                  
@@ -236,5 +236,8 @@ class Patch:
     
 if __name__ == '__main__':
     args = parse_args()
+    if args.linux == None or args.patch == None:
+        print("-linux and -patch cannot be None")
+        exit(0)
     p = Patch(args.linux, args.patch)
     p.run()
