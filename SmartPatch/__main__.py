@@ -229,8 +229,30 @@ class Patch:
         lines = r.stdout.split(b'\n')
         # later may earlier than from_version
         if len(lines) == 1:
+            more = self._find_ported_commits(earlier)
+            for e in more:
+                if self.commit_earlier(e, later):
+                    return True
             return False
         return True
+    
+    def _find_ported_commits(self, commit):
+        res = []
+
+        cmds = ["git log --oneline {} -n 1".format(commit)]
+        r = subprocess.run(cmds, stdout=subprocess.PIPE, cwd=self.linux_path, shell=True)
+        lines = r.stdout.split(b'\n')
+        line = lines[0].decode("utf-8").strip('\n').strip('\r')
+        text = line[13:]
+
+        cmds = ["git log --oneline | grep \"{}\"".format(text)]
+        r = subprocess.run(cmds, stdout=subprocess.PIPE, cwd=self.linux_path, shell=True)
+        lines = r.stdout.split(b'\n')
+        for line in lines:
+            line = line.decode("utf-8").strip('\n').strip('\r')
+            if commit != line[:12] and line != '':
+                res.append(line[:12])
+        return res
     
 if __name__ == '__main__':
     args = parse_args()
