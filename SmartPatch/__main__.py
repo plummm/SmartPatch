@@ -1,12 +1,8 @@
 import logging
 import json
-import os
+import os, sys
 import argparse
 import subprocess
-
-# The earlist commit we plan to go
-commit_v4_9 = "69973b830859"
-commit_tale = {}
 
 def sub_match(sub, line):
    return (sub in line) or sub == ""
@@ -16,19 +12,28 @@ def parse_args():
     parser.add_argument('-linux', nargs='?', action='store',
                         help='the full path of linux kernel source code')
     parser.add_argument('-patch', nargs='?', action='store',
-                        help='path of the patch json')                  
+                        help='path of the patch json')
+    parser.add_argument('-debug', action='store_true', default=False,
+                        help='debug mode')              
     args = parser.parse_args()
     return args
 
 class Patch:
-    def __init__(self, linux_path, config_path="./patch.json"):
+    def __init__(self, linux_path, config_path, debug=False):
         self.linux_path = linux_path
         self.config_path = config_path
-        self.logger = self.__init_logger()
+        self.logger = self.__init_logger(debug)
         self.version = self.__get_linux_version()
 
-    def __init_logger(self):
+    def __init_logger(self, debug=False):
+        handler = logging.StreamHandler(sys.stdout)
         logger = logging.getLogger(__name__)
+        for each_handler in logger.handlers:
+            logger.removeHandler(each_handler)
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        if debug:
+            logger.setLevel(logging.DEBUG)
         return logger
 
     def __get_linux_version(self):
@@ -203,29 +208,13 @@ class Patch:
             return res
         if from_version != "":
             if to_version == "":
-                return not self.version_out_of_range(commit_v4_9, from_version, comp_version)
+                return not from_version.startswith(self.get_short_commit(from_version))
+                #return not self.version_out_of_range(commit_v4_9, from_version, comp_version)
+            else:
+                return (not from_version.startswith(self.get_short_commit(from_version))) or \
+                     to_version.startswith(self.get_short_commit(to_version))
         else:
-            from_version = commit_v4_9
-        if self.key_in_table(from_version, to_version):
-            return commit_tale[from_version][to_version]
-        cmds = ["git", "rev-list", "^"+from_version, comp_version]
-        r = subprocess.run(cmds, stdout=subprocess.PIPE, cwd=self.linux_path)
-        lines = r.stdout.split(b'\n')
-        # comp_version may earlier than from_version
-        if len(lines) == 1 and lines[0] == b'':
-            res = True
-        for line in lines:
-            line = line.decode("utf-8").strip('\n').strip('\r')
-            if to_version in line:
-                res = True
-                break
-        commit_tale[from_version][to_version] = res
-        return res
-
-    def key_in_table(self, from_version, to_version):
-        if from_version not in commit_tale:
-            commit_tale[from_version] = {}
-        return to_version in commit_tale[from_version]
+            return to_version.startswith(self.get_short_commit(to_version))
     
     def get_short_commit(self, commit):
         cmds = ["git log --oneline {} -n 1 | awk '{{print $1}}'".format(commit)]
@@ -239,5 +228,5 @@ if __name__ == '__main__':
     if args.linux == None or args.patch == None:
         print("-linux and -patch cannot be None")
         exit(0)
-    p = Patch(args.linux, args.patch)
+    p = Patch(args.linux, args.patch, args.debug)
     p.run()
