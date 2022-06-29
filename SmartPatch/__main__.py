@@ -208,13 +208,13 @@ class Patch:
             return res
         if from_version != "":
             if to_version == "":
-                return not from_version.startswith(self.get_short_commit(from_version))
+                return not self.commit_earlier(from_version, comp_version)
                 #return not self.version_out_of_range(commit_v4_9, from_version, comp_version)
             else:
-                return (not from_version.startswith(self.get_short_commit(from_version))) or \
-                     to_version.startswith(self.get_short_commit(to_version))
+                return (not self.commit_earlier(from_version, comp_version)) or \
+                    self.commit_earlier(to_version, comp_version)
         else:
-            return to_version.startswith(self.get_short_commit(to_version))
+            return self.commit_earlier(to_version, comp_version)
     
     def get_short_commit(self, commit):
         cmds = ["git log --oneline {} -n 1 | awk '{{print $1}}'".format(commit)]
@@ -222,6 +222,15 @@ class Patch:
         lines = r.stdout.split(b'\n')
         line = lines[0].decode("utf-8").strip('\n').strip('\r')
         return line
+    
+    def commit_earlier(self, earlier, later):
+        cmds = ["git", "rev-list", "--ancestry-path", "^"+earlier, later]
+        r = subprocess.run(cmds, stdout=subprocess.PIPE, cwd=self.linux_path)
+        lines = r.stdout.split(b'\n')
+        # later may earlier than from_version
+        if len(lines) == 1:
+            return False
+        return True
     
 if __name__ == '__main__':
     args = parse_args()
